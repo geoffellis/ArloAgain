@@ -1,2 +1,4 @@
 pyaarlo
 python-dotenv
+watchdog
+ultralytics

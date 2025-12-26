@@ -22,8 +22,8 @@ Note:
     This implementation uses the 'pyaarlo' library which supports 2FA via IMAP.
     Ensure your Gmail account has IMAP enabled and you are using an App Password.
 """
+import asyncio
 import time
-import threading
 import logging
 from datetime import datetime
 from pathlib import Path
@@ -56,52 +56,22 @@ logger = logging.getLogger(__name__)
 # Create download directory if it doesn't exist
 DOWNLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
-def download_video(arlo, recording, filename):
-    """Download a single video recording."""
-    try:
-        logger.info(f"Downloading: {filename}")
-        recording.download_video(str(DOWNLOAD_DIR / filename))
-        logger.info(f"Successfully downloaded: {filename}")
-        return True
-    except Exception as e:
-        logger.error(f"Error downloading {filename}: {e}")
-        return False
-
-def check_for_new_media(arlo):
-    """Check media library and download new videos."""
-    try:
-        # pyaarlo property access triggers a refresh of the library
-        for recording in arlo.media_library:
-            timestamp = datetime.fromtimestamp(int(recording.created_at) / 1000.0)
-            filename = f"arlo_{timestamp.strftime('%Y%m%d_%H%M%S')}.mp4"
-            filepath = DOWNLOAD_DIR / filename
-            
-            # Download if not already present
-            if not filepath.exists():
-                download_video(arlo, recording, filename)
-    except Exception as e:
-        logger.error(f"Error checking media library: {e}")
-
-def listen_for_events(arlo):
+async def listen_for_events(arlo):
     """Listen for new media events and download videos."""
     logger.info("Starting Arlo event listener...")
 
     def on_new_capture(device, attr, value):
         logger.info(f"New capture detected on {device.name} (Attribute: {attr})")
-        # Run check in separate thread to avoid blocking the event listener
-        threading.Thread(target=check_for_new_media, args=(arlo,)).start()
+        # Note: Download is handled automatically by save_media_to in PyArlo constructor
 
     # Register callbacks for all cameras
     for camera in arlo.cameras:
         logger.info(f"Registering callback for camera: {camera.name}")
         camera.add_attr_callback('lastCaptureTime', on_new_capture)
-
-    # Initial check to catch anything missed while offline
-    check_for_new_media(arlo)
     
     try:
         while True:
-            time.sleep(1)  # Keep the main thread alive
+            await asyncio.sleep(1)  # Keep the main thread alive
             
     except KeyboardInterrupt:
         logger.info("Shutting down listener...")
@@ -109,27 +79,38 @@ def listen_for_events(arlo):
     except Exception as e:
         logger.error(f"Error in event listener: {e}")
 
-def main():
+async def main():
     while True:
         try:
             logger.info("Authenticating with Arlo...")
-            arlo = pyaarlo.PyArlo(
+            # Configure automatic download path
+            # Format: arlo_YYYYMMDD_HHMMSS (extension added automatically)
+            save_path = str(DOWNLOAD_DIR / "arlo_${Y}${m}${d}_${H}${M}${S}")
+            
+            loop = asyncio.get_event_loop()
+            arlo = await loop.run_in_executor(None, lambda: pyaarlo.PyArlo(
                 username=ARLO_USERNAME,
                 password=ARLO_PASSWORD,
                 tfa_source='imap',
                 tfa_type='email',
                 tfa_host=ARLO_2FA_HOST,
                 tfa_username=ARLO_2FA_EMAIL,
-                tfa_password=ARLO_2FA_PASSWORD
-            )
-            listen_for_events(arlo)
-        except KeyboardInterrupt:
+                tfa_password=ARLO_2FA_PASSWORD,
+                tfa_total_retries=20,
+                tfa_delay=3,
+                save_media_to=save_path
+            ))
+            await listen_for_events(arlo)
+        except (KeyboardInterrupt, asyncio.CancelledError):
             logger.info("Exiting application...")
             break
         except Exception as e:
             logger.error(f"Connection lost or failed: {e}")
             logger.info("Restarting in 60 seconds...")
-            time.sleep(60)
+            await asyncio.sleep(60)
 
 if __name__ == "__main__":
-    main()
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        pass
