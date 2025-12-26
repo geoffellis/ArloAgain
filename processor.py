@@ -6,11 +6,18 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 from ultralytics import YOLO
+from slack_sdk import WebClient
+from slack_sdk.errors import SlackApiError
 
 # Load environment variables
 load_dotenv()
 
 DOWNLOAD_DIR = Path(os.getenv("DOWNLOAD_DIR", "C:/Users/geoff/Videos/Arlo"))
+DOWNLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+# Slack Configuration
+SLACK_API_TOKEN = os.getenv("SLACK_API_TOKEN")
+SLACK_CHANNEL_ID = os.getenv("SLACK_CHANNEL_ID")
 
 # Initialize YOLO model (will download yolov8n.pt on first run)
 model = YOLO('yolov8n.pt')
@@ -20,6 +27,12 @@ class FileHandler(FileSystemEventHandler):
         if not event.is_directory and event.src_path.lower().endswith('.mp4'):
             filepath = event.src_path
             print(f"New file detected: {filepath}")
+            self.process_file(filepath)
+
+    def on_moved(self, event):
+        if not event.is_directory and event.dest_path.lower().endswith('.mp4'):
+            filepath = event.dest_path
+            print(f"New file detected (renamed): {filepath}")
             self.process_file(filepath)
 
     def process_file(self, filepath):
@@ -58,6 +71,23 @@ class FileHandler(FileSystemEventHandler):
                         # Save the detected frame as a JPG
                         image_path = str(Path(filepath).with_suffix('.jpg'))
                         cv2.imwrite(image_path, frame)
+
+                        # Send notification to Slack
+                        if SLACK_API_TOKEN:
+                            try:
+                                client = WebClient(token=SLACK_API_TOKEN)
+                                client.files_upload_v2(
+                                    channel=SLACK_CHANNEL_ID,
+                                    file=image_path,
+                                    title="Person Detected",
+                                    initial_comment=f"⚠️ Person detected in video: {os.path.basename(filepath)}\n📅 Time: {time.strftime('%Y-%m-%d %H:%M:%S')}"
+                                )
+                                print(f"Slack notification sent to {SLACK_CHANNEL_ID}")
+                            except SlackApiError as e:
+                                error_msg = e.response['error']
+                                print(f"Error sending Slack notification: {error_msg}")
+                                if error_msg == 'invalid_arguments' and str(SLACK_CHANNEL_ID).startswith('#'):
+                                    print(f"Tip: SLACK_CHANNEL_ID must be a Channel ID (e.g., C12345), not a name ({SLACK_CHANNEL_ID}).")
                         break
             finally:
                 cap.release()

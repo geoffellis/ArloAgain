@@ -2,3 +2,4 @@ pyaarlo
 python-dotenv
 watchdog
 ultralytics
+slack_sdk
