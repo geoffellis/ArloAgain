@@ -28,6 +28,7 @@ import logging
 from datetime import datetime
 from pathlib import Path
 import pyaarlo
+import pyaarlo.location
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -55,6 +56,18 @@ logger = logging.getLogger(__name__)
 
 # Create download directory if it doesn't exist
 DOWNLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+# Monkey patch to fix AttributeError in pyaarlo.location.Location.update
+# This handles cases where the Arlo API returns None for location data
+if hasattr(pyaarlo.location, 'Location'):
+    _original_location_update = pyaarlo.location.Location.update
+
+    def _safe_location_update(self, data):
+        if data is None:
+            return
+        return _original_location_update(self, data)
+
+    pyaarlo.location.Location.update = _safe_location_update
 
 async def listen_for_events(arlo):
     """Listen for new media events and download videos."""
@@ -101,7 +114,7 @@ async def main():
                 save_media_to=save_path
             ))
             await listen_for_events(arlo)
-        except (KeyboardInterrupt, asyncio.CancelledError):
+        except KeyboardInterrupt:
             logger.info("Exiting application...")
             break
         except Exception as e:
