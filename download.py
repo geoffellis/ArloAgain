@@ -57,18 +57,6 @@ logger = logging.getLogger(__name__)
 # Create download directory if it doesn't exist
 DOWNLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
-# Monkey patch to fix AttributeError in pyaarlo.location.Location.update
-# This handles cases where the Arlo API returns None for location data
-if hasattr(pyaarlo.location, 'Location'):
-    _original_location_update = pyaarlo.location.Location.update
-
-    def _safe_location_update(self, data):
-        if data is None:
-            return
-        return _original_location_update(self, data)
-
-    pyaarlo.location.Location.update = _safe_location_update
-
 async def listen_for_events(arlo):
     """Listen for new media events and download videos."""
     logger.info("Starting Arlo event listener...")
@@ -111,7 +99,12 @@ async def main():
                 tfa_password=ARLO_2FA_PASSWORD,
                 tfa_total_retries=20,
                 tfa_delay=3,
-                save_media_to=save_path
+                mode_api='v2',
+                save_media_to=save_path,
+                refresh_devices_every=3,
+                stream_timeout=180,
+                reconnect_every=90,
+                request_timeout=120
             ))
             await listen_for_events(arlo)
         except KeyboardInterrupt:
