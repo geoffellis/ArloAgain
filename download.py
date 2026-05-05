@@ -25,7 +25,8 @@ Note:
 import asyncio
 import time
 import logging
-from datetime import datetime
+import shutil
+from datetime import datetime, timedelta
 from pathlib import Path
 import pyaarlo
 import pyaarlo.location
@@ -69,11 +70,11 @@ async def listen_for_events(arlo):
     for camera in arlo.cameras:
         logger.info(f"Registering callback for camera: {camera.name}")
         camera.add_attr_callback('lastCaptureTime', on_new_capture)
-    
+
     try:
         while True:
             await asyncio.sleep(1)  # Keep the main thread alive
-            
+
     except KeyboardInterrupt:
         logger.info("Shutting down listener...")
         raise
@@ -84,10 +85,6 @@ async def main():
     while True:
         try:
             logger.info("Authenticating with Arlo...")
-            # Configure automatic download path
-            # Format: arlo_YYYYMMDD_HHMMSS (extension added automatically)
-            save_path = str(DOWNLOAD_DIR / "arlo_${Y}${m}${d}_${H}${M}${S}")
-            
             loop = asyncio.get_event_loop()
             arlo = await loop.run_in_executor(None, lambda: pyaarlo.PyArlo(
                 username=ARLO_USERNAME,
@@ -100,12 +97,14 @@ async def main():
                 tfa_total_retries=20,
                 tfa_delay=3,
                 mode_api='v2',
-                save_media_to=save_path,
+                save_media_to=str(DOWNLOAD_DIR / "arlo_${Y}${m}${d}_${H}${M}${S}"),
+                library_days=0,  # Disable media library loading to prevent errors
                 refresh_devices_every=3,
                 stream_timeout=180,
                 reconnect_every=90,
                 request_timeout=120
             ))
+
             await listen_for_events(arlo)
         except KeyboardInterrupt:
             logger.info("Exiting application...")

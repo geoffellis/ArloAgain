@@ -156,3 +156,110 @@
 2026-01-03 11:26:40,030 - INFO - Authenticating with Arlo...
 2026-01-03 11:26:40,030 - INFO - pyarlo 0.8.0.17 starting...
 2026-01-03 11:26:44,920 - INFO - pyaarlo starting
+2026-05-05 08:46:55,088 - INFO - Authenticating with Arlo...
+2026-05-05 08:46:55,090 - INFO - pyarlo 0.8.0.19 starting...
+2026-05-05 08:46:57,404 - WARNING - error in new response={'meta': {'code': 400, 'error': 9261, 'message': 'Invalid factor data'}}
+2026-05-05 08:47:08,553 - INFO - pyaarlo starting
+2026-05-05 08:47:11,995 - INFO - Starting Arlo event listener...
+2026-05-05 08:47:11,997 - INFO - Registering callback for camera: Back Door
+2026-05-05 08:47:11,997 - INFO - Registering callback for camera: Chipmunk
+2026-05-05 08:47:11,997 - INFO - Registering callback for camera: Grey Squirrel
+2026-05-05 08:56:09,501 - INFO - Authenticating with Arlo...
+2026-05-05 08:56:09,501 - INFO - pyarlo 0.8.0.19 starting...
+2026-05-05 08:56:12,589 - INFO - pyaarlo starting
+2026-05-05 08:56:15,803 - INFO - Starting Arlo event listener...
+2026-05-05 08:56:15,803 - INFO - Registering callback for camera: Back Door
+2026-05-05 08:56:15,803 - INFO - Registering callback for camera: Chipmunk
+2026-05-05 08:56:15,803 - INFO - Registering callback for camera: Grey Squirrel
+2026-05-05 10:56:13,437 - ERROR - failed to read modes (v2)
+2026-05-05 11:01:41,275 - ERROR - job-error=TypeError
+Traceback (most recent call last):
+  File "C:\Users\geoff\OneDrive\Documents\ArloAgain\.venv\Lib\site-packages\pyaarlo\background.py", line 35, in _run_next
+    job["callback"](**job["args"])
+  File "C:\Users\geoff\OneDrive\Documents\ArloAgain\.venv\Lib\site-packages\pyaarlo\media.py", line 193, in update
+    for video in data:
+                 ^^^^
+TypeError: 'NoneType' object is not iterable
+
+2026-05-05 11:06:13,338 - ERROR - failed to read modes (v2)
+2026-05-05 11:16:13,382 - ERROR - failed to read modes (v2)
+2026-05-05 11:26:13,389 - ERROR - failed to read modes (v2)
+2026-05-05 11:36:13,834 - ERROR - failed to read modes (v2)
+2026-05-05 11:46:13,262 - ERROR - failed to read modes (v2)
+2026-05-05 11:56:13,232 - WARNING - No devices returned from /hmsweb/v2/users/devices?t=1778007373067
+2026-05-05 11:56:13,371 - ERROR - failed to read modes (v2)
+2026-05-05 12:06:13,073 - ERROR - failed to read modes (v2)
+2026-05-05 12:16:13,034 - ERROR - failed to read modes (v2)
+2026-05-05 12:26:13,008 - ERROR - failed to read modes (v2)
+2026-05-05 12:36:12,947 - ERROR - failed to read modes (v2)
+2026-05-05 12:46:12,883 - ERROR - failed to read modes (v2)
+2026-05-05 12:56:12,915 - ERROR - failed to read modes (v2)
+2026-05-05 13:06:12,883 - ERROR - failed to read modes (v2)
+2026-05-05 13:16:12,842 - ERROR - failed to read modes (v2)
+2026-05-05 13:26:12,786 - ERROR - failed to read modes (v2)
+2026-05-05 13:36:12,782 - ERROR - failed to read modes (v2)
+2026-05-05 13:46:12,814 - ERROR - failed to read modes (v2)
+2026-05-05 13:56:12,811 - ERROR - failed to read modes (v2)
+2026-05-05 14:06:12,774 - ERROR - failed to read modes (v2)
+2026-05-05 14:16:12,735 - ERROR - failed to read modes (v2)
+2026-05-05 14:26:12,760 - ERROR - failed to read modes (v2)
+2026-05-05 14:36:12,790 - ERROR - failed to read modes (v2)
+2026-05-05 14:46:12,810 - ERROR - failed to read modes (v2)
+2026-05-05 14:56:12,720 - ERROR - failed to read modes (v2)
+2026-05-05 14:57:12,750 - WARNING - No devices returned from /hmsweb/v2/users/devices?t=1778018232637
+2026-05-05 15:06:12,788 - ERROR - failed to read modes (v2)
+2026-05-05 15:16:12,720 - ERROR - failed to read modes (v2)
+2026-05-05 15:26:12,722 - ERROR - failed to read modes (v2)
+2026-05-05 15:36:12,744 - ERROR - failed to read modes (v2)
+2026-05-05 15:43:36,542 - INFO - Authenticating with Arlo...
+2026-05-05 15:43:36,565 - INFO - pyarlo 0.8.0.19 starting...
+2026-05-05 15:43:39,982 - INFO - pyaarlo starting
+2026-05-05 15:43:42,835 - INFO - Starting Arlo event listener...
+2026-05-05 15:43:42,835 - INFO - Registering callback for camera: Back Door
+2026-05-05 15:43:42,837 - INFO - Registering callback for camera: Chipmunk
+2026-05-05 15:43:42,837 - INFO - Registering callback for camera: Grey Squirrel
+2026-05-05 15:52:08,273 - INFO - Authenticating with Arlo...
+2026-05-05 15:52:08,276 - INFO - pyarlo 0.8.0.19 starting...
+2026-05-05 15:52:11,407 - INFO - pyaarlo starting
+2026-05-05 15:53:22,766 - INFO - Authenticating with Arlo...
+2026-05-05 15:53:22,766 - INFO - pyarlo 0.8.0.19 starting...
+2026-05-05 15:53:26,211 - INFO - pyaarlo starting
+2026-05-05 15:53:28,960 - INFO - Starting Arlo event listener...
+2026-05-05 15:53:28,960 - INFO - Registering callback for camera: Back Door
+2026-05-05 15:53:28,960 - INFO - Registering callback for camera: Chipmunk
+2026-05-05 15:53:28,960 - INFO - Registering callback for camera: Grey Squirrel
+2026-05-05 15:57:07,240 - INFO - Authenticating with Arlo...
+2026-05-05 15:57:07,240 - INFO - pyarlo 0.8.0.19 starting...
+2026-05-05 15:57:10,868 - INFO - pyaarlo starting
+2026-05-05 15:57:13,866 - INFO - Starting Arlo event listener...
+2026-05-05 15:57:13,866 - INFO - Registering callback for camera: Back Door
+2026-05-05 15:57:13,866 - INFO - Registering callback for camera: Chipmunk
+2026-05-05 15:57:13,866 - INFO - Registering callback for camera: Grey Squirrel
+2026-05-05 15:58:04,750 - INFO - Authenticating with Arlo...
+2026-05-05 15:58:04,750 - INFO - pyarlo 0.8.0.19 starting...
+2026-05-05 15:58:08,070 - INFO - pyaarlo starting
+2026-05-05 15:58:11,401 - INFO - Starting Arlo event listener...
+2026-05-05 15:58:11,403 - INFO - Registering callback for camera: Back Door
+2026-05-05 15:58:11,403 - INFO - Registering callback for camera: Chipmunk
+2026-05-05 15:58:11,404 - INFO - Registering callback for camera: Grey Squirrel
+2026-05-05 16:05:00,377 - INFO - Authenticating with Arlo...
+2026-05-05 16:05:00,377 - INFO - pyarlo 0.8.0.19 starting...
+2026-05-05 16:05:04,417 - INFO - pyaarlo starting
+2026-05-05 16:05:07,415 - INFO - Starting Arlo event listener...
+2026-05-05 16:05:07,415 - INFO - Registering callback for camera: Back Door
+2026-05-05 16:05:07,415 - INFO - Registering callback for camera: Chipmunk
+2026-05-05 16:05:07,415 - INFO - Registering callback for camera: Grey Squirrel
+2026-05-05 16:08:48,890 - INFO - Authenticating with Arlo...
+2026-05-05 16:08:48,897 - INFO - pyarlo 0.8.0.19 starting...
+2026-05-05 16:08:51,752 - INFO - pyaarlo starting
+2026-05-05 16:08:54,221 - INFO - Starting Arlo event listener...
+2026-05-05 16:08:54,221 - INFO - Registering callback for camera: Back Door
+2026-05-05 16:08:54,221 - INFO - Registering callback for camera: Chipmunk
+2026-05-05 16:08:54,221 - INFO - Registering callback for camera: Grey Squirrel
+2026-05-05 16:09:51,231 - INFO - Authenticating with Arlo...
+2026-05-05 16:09:51,231 - INFO - pyarlo 0.8.0.19 starting...
+2026-05-05 16:09:54,410 - INFO - pyaarlo starting
+2026-05-05 16:09:57,383 - INFO - Starting Arlo event listener...
+2026-05-05 16:09:57,383 - INFO - Registering callback for camera: Back Door
+2026-05-05 16:09:57,383 - INFO - Registering callback for camera: Chipmunk
+2026-05-05 16:09:57,383 - INFO - Registering callback for camera: Grey Squirrel
