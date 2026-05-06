@@ -1,6 +1,9 @@
 import time
 import json
 import cv2
+import av
+import queue
+import threading
 from datetime import datetime, timedelta
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
@@ -25,6 +28,7 @@ TEMP_EXTENSIONS = {'.tmp', '.part'}
 # Slack Configuration
 SLACK_API_TOKEN = os.getenv("SLACK_API_TOKEN")
 SLACK_CHANNEL_ID = os.getenv("SLACK_CHANNEL_ID")
+DEEP_SCAN_SKIP = int(os.getenv("DEEP_SCAN_SKIP", "10"))
 
 # Initialize YOLO model (will download yolov8n.pt on first run)
 model = YOLO('yolov8n.pt')
@@ -33,7 +37,12 @@ class FileHandler(FileSystemEventHandler):
     def __init__(self):
         super().__init__()
         self.processed_files = {}
+        self.queue = queue.Queue()
         self._load_processed_log()
+        
+        # Start the background worker thread
+        self.worker_thread = threading.Thread(target=self._worker, daemon=True)
+        self.worker_thread.start()
 
     def _load_processed_log(self):
         cutoff = datetime.now() - timedelta(days=MAX_LOG_AGE_DAYS)
@@ -84,6 +93,17 @@ class FileHandler(FileSystemEventHandler):
         # A separate cron routine will purge old videos
         pass
 
+    def _worker(self):
+        """Background worker to process files from the queue one by one."""
+        while True:
+            filepath = self.queue.get()
+            try:
+                self.process_file(filepath)
+            except Exception as e:
+                print(f"Worker thread error: {e}")
+            finally:
+                self.queue.task_done()
+
     def on_created(self, event):
         if event.is_directory:
             return
@@ -95,7 +115,7 @@ class FileHandler(FileSystemEventHandler):
         filepath = event.src_path
         if Path(filepath).parent == DOWNLOAD_DIR:
             print(f"New file detected: {filepath}")
-            self.process_file(filepath)
+            self.queue.put(filepath)
 
     def on_moved(self, event):
         if event.is_directory:
@@ -108,17 +128,46 @@ class FileHandler(FileSystemEventHandler):
         filepath = event.dest_path
         if Path(filepath).parent == DOWNLOAD_DIR:
             print(f"New file detected (renamed): {filepath}")
-            self.process_file(filepath)
+            self.queue.put(filepath)
 
     def process_existing_files(self):
-        """Process any .mp4 files already present in the watched folder."""
-        for existing_file in DOWNLOAD_DIR.glob('*.mp4'):
+        """Process any .mp4 files already present in the watched folder, oldest first."""
+        files = list(DOWNLOAD_DIR.glob('*.mp4'))
+        # Sort by modification time (oldest first)
+        files.sort(key=lambda x: x.stat().st_mtime)
+
+        for existing_file in files:
             filepath = str(existing_file.resolve())
             if self._is_processed(filepath):
                 print(f"Already processed on startup, skipping: {filepath}")
                 continue
-            print(f"Found existing file: {filepath}")
-            self.process_file(filepath)
+            print(f"Found existing file (queued oldest to newest): {filepath}")
+            self.queue.put(filepath)
+
+    def _detect_person(self, frame):
+        """Runs YOLO detection on a frame and returns True if a person is found."""
+        results = model(frame, classes=[0], conf=0.5, verbose=False)
+        return len(results[0].boxes) > 0
+
+    def _handle_person_detected(self, filepath, frame):
+        """Handles image saving and Slack notification."""
+        print(f"⚠️ PERSON DETECTED in: {filepath}")
+        image_path = str(Path(filepath).with_suffix('.jpg'))
+        cv2.imwrite(image_path, frame)
+
+        if SLACK_API_TOKEN:
+            try:
+                client = WebClient(token=SLACK_API_TOKEN)
+                client.files_upload_v2(
+                    channel=SLACK_CHANNEL_ID,
+                    file=image_path,
+                    title="Person Detected",
+                    initial_comment=f"⚠️ Person detected in video: {os.path.basename(filepath)}\n📅 Time: {time.strftime('%Y-%m-%d %H:%M:%S')}"
+                )
+                print(f"Slack notification sent to {SLACK_CHANNEL_ID}")
+            except SlackApiError as e:
+                error_msg = e.response['error']
+                print(f"Error sending Slack notification: {error_msg}")
 
     def process_file(self, filepath):
         filepath_resolved = str(Path(filepath).resolve())
@@ -127,55 +176,50 @@ class FileHandler(FileSystemEventHandler):
             return
 
         try:
-            print(f"Scanning {filepath} for people...")
-
-            cap = cv2.VideoCapture(filepath)
-            if not cap.isOpened():
-                print(f"Could not open video: {filepath}")
-                self._record_processed_file(filepath_resolved)
-                return
-
             person_detected = False
-            frame_skip = 5  # Process every 5th frame to speed up
-            frame_count = 0
 
-            try:
-                while True:
-                    success, frame = cap.read()
-                    if not success:
+            # Pass 1: Key Frame Pass (I-frames only)
+            print(f"Pass 1: Scanning I-frames in {filepath}...")
+            with av.open(filepath) as container:
+                stream = container.streams.video[0]
+                # demux() allows us to check packet headers without decoding the whole frame
+                for packet in container.demux(stream):
+                    if packet.is_keyframe:
+                        for frame in packet.decode():
+                            # Convert PyAV frame to BGR numpy array for YOLO/OpenCV
+                            img = frame.to_ndarray(format='bgr24')
+                            if self._detect_person(img):
+                                person_detected = True
+                                self._handle_person_detected(filepath, img)
+                                break
+                    if person_detected:
                         break
 
-                    frame_count += 1
-                    if frame_count % frame_skip != 0:
-                        continue
+            # Pass 2: Deep Scan (Scan every single frame)
+            if not person_detected:
+                print(f"No person found in I-frames. Pass 2: Scanning every {DEEP_SCAN_SKIP} frames in {filepath}...")
+                cap = cv2.VideoCapture(filepath)
+                if not cap.isOpened():
+                    print(f"Could not open video: {filepath}")
+                    self._record_processed_file(filepath_resolved)
+                    return
 
-                    results = model(frame, classes=[0], conf=0.5, verbose=False)
+                try:
+                    frame_count = 0
+                    while True:
+                        success, frame = cap.read()
+                        if not success:
+                            break
 
-                    if len(results[0].boxes) > 0:
-                        person_detected = True
-                        print(f"⚠️ PERSON DETECTED in: {filepath}")
-
-                        image_path = str(Path(filepath).with_suffix('.jpg'))
-                        cv2.imwrite(image_path, frame)
-
-                        if SLACK_API_TOKEN:
-                            try:
-                                client = WebClient(token=SLACK_API_TOKEN)
-                                client.files_upload_v2(
-                                    channel=SLACK_CHANNEL_ID,
-                                    file=image_path,
-                                    title="Person Detected",
-                                    initial_comment=f"⚠️ Person detected in video: {os.path.basename(filepath)}\n📅 Time: {time.strftime('%Y-%m-%d %H:%M:%S')}"
-                                )
-                                print(f"Slack notification sent to {SLACK_CHANNEL_ID}")
-                            except SlackApiError as e:
-                                error_msg = e.response['error']
-                                print(f"Error sending Slack notification: {error_msg}")
-                                if error_msg == 'invalid_arguments' and str(SLACK_CHANNEL_ID).startswith('#'):
-                                    print(f"Tip: SLACK_CHANNEL_ID must be a Channel ID (e.g., C12345), not a name ({SLACK_CHANNEL_ID}).")
-                        break
-            finally:
-                cap.release()
+                        if frame_count % DEEP_SCAN_SKIP == 0:
+                            if self._detect_person(frame):
+                                person_detected = True
+                                print(f"🎯 DEEP SCAN SUCCESS: Person detected in {filepath} (missed by I-frames)")
+                                self._handle_person_detected(filepath, frame)
+                                break
+                        frame_count += 1
+                finally:
+                    cap.release()
 
             if not person_detected:
                 print(f"No person found in: {filepath}")
