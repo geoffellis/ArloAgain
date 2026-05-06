@@ -14,6 +14,7 @@ ExecStart=/home/super/PycharmProjects/Watcher/.venv/bin/python download.py --ser
 Environment=PYTHONUNBUFFERED=1
 SyslogIdentifier=watcher-download
 Restart=always
+RestartSec=10
 
 #[Service]
 #User=super

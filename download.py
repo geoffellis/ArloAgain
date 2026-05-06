@@ -73,7 +73,13 @@ async def listen_for_events(arlo):
 
     try:
         while True:
-            await asyncio.sleep(1)  # Keep the main thread alive
+            await asyncio.sleep(60)  # Check health every minute
+            
+            # Health Check: If the session is dead, pyaarlo often returns an empty camera list
+            # or the internal connection state fails.
+            if not arlo.cameras or len(arlo.cameras) == 0:
+                logger.error("Health check failed: No cameras detected. Session may have expired.")
+                raise ConnectionError("Arlo session lost: No cameras found.")
 
     except KeyboardInterrupt:
         logger.info("Shutting down listener...")
