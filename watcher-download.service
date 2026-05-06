@@ -1,0 +1,26 @@
+[Unit]
+Description=Watcher Download Service
+# Ensure processor starts first
+After=watcher-processor.service
+Requires=watcher-processor.service
+
+[Service]
+User=super
+WorkingDirectory=/home/super/PycharmProjects/Watcher
+EnvironmentFile=/home/super/PycharmProjects/Watcher/.env
+# Point directly to the python binary in your venv
+ExecStart=/home/super/PycharmProjects/Watcher/.venv/bin/python download.py --serve-in-foreground
+# This explicitly sets the process name in the journal
+Environment=PYTHONUNBUFFERED=1
+SyslogIdentifier=watcher-download
+Restart=always
+
+#[Service]
+#User=super
+#WorkingDirectory=/home/super/PycharmProjects/Watcher
+#EnvironmentFile=/home/super/PycharmProjects/Watcher/.env
+#ExecStart=/bin/bash -c 'source /home/super/PycharmProjects/Watcher/.venv/bin/activate && /home/super/PycharmProjects/Watcher/.venv/bin/python download.py --serve-in-foreground'
+#Restart=always
+
+[Install]
+WantedBy=multi-user.target

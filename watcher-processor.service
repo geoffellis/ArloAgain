@@ -1,0 +1,21 @@
+[Unit]
+Description=Watcher Processor Service
+After=network.target
+
+[Service]
+User=super
+WorkingDirectory=/home/super/PycharmProjects/Watcher
+EnvironmentFile=/home/super/PycharmProjects/Watcher/.env
+# Call the venv python directly and remove the bash wrapper/redirection
+ExecStart=/home/super/PycharmProjects/Watcher/.venv/bin/python processor.py
+# This ensures the log prefix is "watcher-processor"
+SyslogIdentifier=watcher-processor
+# Recommended: ensures logs sent to stdout are flushed immediately
+Environment=PYTHONUNBUFFERED=1
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+
+
+
