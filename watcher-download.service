@@ -12,6 +12,7 @@ EnvironmentFile=/home/super/PycharmProjects/Watcher/.env
 ExecStart=/home/super/PycharmProjects/Watcher/.venv/bin/python download.py --serve-in-foreground
 # This explicitly sets the process name in the journal
 Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONASYNCIODEBUG=1
 SyslogIdentifier=watcher-download
 Restart=always
 RestartSec=10

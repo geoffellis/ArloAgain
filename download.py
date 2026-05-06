@@ -73,11 +73,28 @@ async def listen_for_events(arlo):
 
     try:
         while True:
-            await asyncio.sleep(60)  # Check health every minute
+            await asyncio.sleep(60)
             
-            # Health Check: If the session is dead, pyaarlo often returns an empty camera list
-            # or the internal connection state fails.
-            if not arlo.cameras or len(arlo.cameras) == 0:
+            # Detailed Heartbeat Logging to monitor for "stale" states
+            cameras = arlo.cameras
+            camera_count = len(cameras) if cameras else 0
+            base_stations = arlo.base_stations
+            bs_count = len(base_stations) if base_stations else 0
+            
+            logger.info(f"Heartbeat: {camera_count} cameras, {bs_count} base stations detected.")
+            
+            if cameras:
+                for cam in cameras:
+                    # Monitor specific attributes to see if the proxy stops updating
+                    logger.info(f"  - {cam.name}: lastCaptureTime={cam.get_attr('lastCaptureTime')}")
+
+            # Check if internal background thread responsible for syncing is still running
+            if hasattr(arlo, '_bg') and arlo._bg and not arlo._bg.is_alive():
+                logger.error("Arlo background sync thread has terminated abnormally.")
+                raise ConnectionError("Arlo background thread died.")
+
+            # If we lose all cameras, the session is likely dead or has been cleared by a failed refresh
+            if camera_count == 0:
                 logger.error("Health check failed: No cameras detected. Session may have expired.")
                 raise ConnectionError("Arlo session lost: No cameras found.")
 
@@ -110,6 +127,8 @@ async def main():
                 reconnect_every=90,
                 request_timeout=120
             ))
+
+            logger.info(f"Arlo initialized. Found {len(arlo.cameras)} cameras: {[c.name for c in arlo.cameras]}")
 
             await listen_for_events(arlo)
         except KeyboardInterrupt:
