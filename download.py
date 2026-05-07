@@ -23,6 +23,8 @@ Note:
     Ensure your Gmail account has IMAP enabled and you are using an App Password.
 """
 import asyncio
+import os
+import sys
 import time
 import logging
 import shutil
@@ -88,56 +90,54 @@ async def listen_for_events(arlo):
                     # Monitor specific attributes to see if the proxy stops updating
                     logger.info(f"  - {cam.name}: lastCaptureTime={cam.get_attr('lastCaptureTime')}")
 
-            # Check if internal background thread responsible for syncing is still running
-            if hasattr(arlo, '_bg') and arlo._bg and not arlo._bg.is_alive():
-                logger.error("Arlo background sync thread has terminated abnormally.")
-                raise ConnectionError("Arlo background thread died.")
-
             # If we lose all cameras, the session is likely dead or has been cleared by a failed refresh
             if camera_count == 0:
-                logger.error("Health check failed: No cameras detected. Session may have expired.")
-                raise ConnectionError("Arlo session lost: No cameras found.")
+                logger.error("Health check failed: 0 cameras detected. Terminating process for systemd restart.")
+                os._exit(1)
 
     except KeyboardInterrupt:
         logger.info("Shutting down listener...")
         raise
     except Exception as e:
-        logger.error(f"Error in event listener: {e}")
+        logger.error(f"Critical error in event listener: {e}. Terminating process.")
+        os._exit(1)
 
 async def main():
-    while True:
-        try:
-            logger.info("Authenticating with Arlo...")
-            loop = asyncio.get_event_loop()
-            arlo = await loop.run_in_executor(None, lambda: pyaarlo.PyArlo(
-                username=ARLO_USERNAME,
-                password=ARLO_PASSWORD,
-                tfa_source='imap',
-                tfa_type='email',
-                tfa_host=ARLO_2FA_HOST,
-                tfa_username=ARLO_2FA_EMAIL,
-                tfa_password=ARLO_2FA_PASSWORD,
-                tfa_total_retries=20,
-                tfa_delay=3,
-                mode_api='v2',
-                save_media_to=str(DOWNLOAD_DIR / "arlo_${Y}${m}${d}_${H}${M}${S}"),
-                library_days=0,  # Disable media library loading to prevent errors
-                refresh_devices_every=3,
-                stream_timeout=180,
-                reconnect_every=90,
-                request_timeout=120
-            ))
+    try:
+        logger.info("Authenticating with Arlo...")
+        loop = asyncio.get_event_loop()
+        arlo = await loop.run_in_executor(None, lambda: pyaarlo.PyArlo(
+            username=ARLO_USERNAME,
+            password=ARLO_PASSWORD,
+            tfa_source='imap',
+            tfa_type='email',
+            tfa_host=ARLO_2FA_HOST,
+            tfa_username=ARLO_2FA_EMAIL,
+            tfa_password=ARLO_2FA_PASSWORD,
+            tfa_total_retries=20,
+            tfa_delay=3,
+            mode_api='v2',
+            save_media_to=str(DOWNLOAD_DIR / "arlo_${Y}${m}${d}_${H}${M}${S}"),
+            library_days=0,  # Disable media library loading to prevent errors
+            refresh_devices_every=3,
+            stream_timeout=180,
+            reconnect_every=90,
+            request_timeout=120
+        ))
 
-            logger.info(f"Arlo initialized. Found {len(arlo.cameras)} cameras: {[c.name for c in arlo.cameras]}")
+        if not arlo.cameras or len(arlo.cameras) == 0:
+            logger.error("Arlo initialized but found 0 cameras. This indicates a stale session. Terminating.")
+            os._exit(1)
 
-            await listen_for_events(arlo)
-        except KeyboardInterrupt:
-            logger.info("Exiting application...")
-            break
-        except Exception as e:
-            logger.error(f"Connection lost or failed: {e}")
-            logger.info("Restarting in 60 seconds...")
-            await asyncio.sleep(60)
+        logger.info(f"Arlo initialized. Found {len(arlo.cameras)} cameras: {[c.name for c in arlo.cameras]}")
+
+        await listen_for_events(arlo)
+    except KeyboardInterrupt:
+        logger.info("Exiting application...")
+        sys.exit(0)
+    except Exception as e:
+        logger.error(f"Critical connection failure: {e}. Terminating process.")
+        os._exit(1)
 
 if __name__ == "__main__":
     try:
