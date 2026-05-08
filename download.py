@@ -115,11 +115,11 @@ async def main():
             tfa_username=ARLO_2FA_EMAIL,
             tfa_password=ARLO_2FA_PASSWORD,
             tfa_total_retries=20,
-            tfa_delay=3,
+            tfa_delay=10,
             mode_api='v2',
             save_media_to=str(DOWNLOAD_DIR / "arlo_${Y}${m}${d}_${H}${M}${S}"),
             library_days=0,  # Disable media library loading to prevent errors
-            refresh_devices_every=3,
+            refresh_devices_every=30,
             stream_timeout=180,
             reconnect_every=90,
             request_timeout=120
