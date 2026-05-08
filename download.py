@@ -87,8 +87,11 @@ async def listen_for_events(arlo):
             
             if cameras:
                 for cam in cameras:
-                    # Monitor specific attributes to see if the proxy stops updating
-                    logger.info(f"  - {cam.name}: lastCaptureTime={cam.get_attr('lastCaptureTime')}")
+                    # Try 'state' or 'is_unavailable' which are more common in 0.8.x
+                    state = getattr(cam, 'state', 'unknown')
+                    online = "offline" if getattr(cam, 'is_unavailable', False) else "online"
+                    status = f"{state} ({online})"
+                    logger.info(f"  - {cam.name}: status={status}")
 
             # If we lose all cameras, the session is likely dead or has been cleared by a failed refresh
             if camera_count == 0:
@@ -118,7 +121,7 @@ async def main():
             tfa_delay=10,
             mode_api='v2',
             save_media_to=str(DOWNLOAD_DIR / "arlo_${Y}${m}${d}_${H}${M}${S}"),
-            library_days=0,  # Disable media library loading to prevent errors
+            library_days=1,  # Load recordings from the last 7 days
             refresh_devices_every=30,
             stream_timeout=180,
             reconnect_every=90,
