@@ -86,12 +86,20 @@ async def listen_for_events(arlo):
             logger.info(f"Heartbeat: {camera_count} cameras, {bs_count} base stations detected.")
             
             if cameras:
+                online_count = 0
                 for cam in cameras:
                     # Try 'state' or 'is_unavailable' which are more common in 0.8.x
+                    is_offline = getattr(cam, 'is_unavailable', False)
                     state = getattr(cam, 'state', 'unknown')
-                    online = "offline" if getattr(cam, 'is_unavailable', False) else "online"
-                    status = f"{state} ({online})"
+                    status = f"{state} ({'offline' if is_offline else 'online'})"
                     logger.info(f"  - {cam.name}: status={status}")
+                    if not is_offline:
+                        online_count += 1
+
+                # If we have cameras but all are reported offline, the session or API is likely dead
+                if camera_count > 0 and online_count == 0:
+                    logger.error("Health check failed: All cameras are offline/unavailable. Terminating for restart.")
+                    os._exit(1)
 
             # If we lose all cameras, the session is likely dead or has been cleared by a failed refresh
             if camera_count == 0:
@@ -121,7 +129,7 @@ async def main():
             tfa_delay=10,
             mode_api='v2',
             save_media_to=str(DOWNLOAD_DIR / "arlo_${Y}${m}${d}_${H}${M}${S}"),
-            library_days=1,  # Load recordings from the last 7 days
+            library_days=1,  # Load recordings from the last 24hrs
             refresh_devices_every=30,
             stream_timeout=180,
             reconnect_every=90,
