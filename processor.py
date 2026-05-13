@@ -78,12 +78,15 @@ class FileHandler(FileSystemEventHandler):
         filepath = str(Path(filepath).resolve())
         return filepath in self.processed_files
 
-    def _record_processed_file(self, filepath):
+    def _record_processed_file(self, filepath, detection_data=None):
         filepath = str(Path(filepath).resolve())
         entry = {
             'filepath': filepath,
             'processed_at': datetime.now().isoformat()
         }
+        if detection_data:
+            entry.update(detection_data)
+
         self.processed_files[filepath] = datetime.fromisoformat(entry['processed_at'])
         with PROCESSED_LOG.open('a', encoding='utf-8') as file:
             file.write(json.dumps(entry) + '\n')
@@ -145,22 +148,24 @@ class FileHandler(FileSystemEventHandler):
             self.queue.put(filepath)
 
     def _detect_person(self, frame):
-        """Runs YOLO detection on a frame and returns True if a person is found."""
+        """Runs YOLO detection on a frame and returns (found, boxes)."""
         results = model(frame, classes=[0], conf=0.5, verbose=False)
-        return len(results[0].boxes) > 0
+        if len(results[0].boxes) > 0:
+            return True, results[0].boxes.xyxy.tolist()
+        return False, []
 
     def _handle_person_detected(self, filepath, frame):
         """Handles image saving and Slack notification."""
         print(f"⚠️ PERSON DETECTED in: {filepath}")
-        image_path = str(Path(filepath).with_suffix('.jpg'))
-        cv2.imwrite(image_path, frame)
+        image_path = Path(filepath).with_suffix('.jpg')
+        cv2.imwrite(str(image_path), frame)
 
         if SLACK_API_TOKEN:
             try:
                 client = WebClient(token=SLACK_API_TOKEN)
                 client.files_upload_v2(
                     channel=SLACK_CHANNEL_ID,
-                    file=image_path,
+                    file=str(image_path),
                     title="Person Detected",
                     initial_comment=f"⚠️ Person detected in video: {os.path.basename(filepath)}\n📅 Time: {time.strftime('%Y-%m-%d %H:%M:%S')}"
                 )
@@ -168,6 +173,7 @@ class FileHandler(FileSystemEventHandler):
             except SlackApiError as e:
                 error_msg = e.response['error']
                 print(f"Error sending Slack notification: {error_msg}")
+        return image_path.name
 
     def process_file(self, filepath):
         filepath_resolved = str(Path(filepath).resolve())
@@ -177,6 +183,11 @@ class FileHandler(FileSystemEventHandler):
 
         try:
             person_detected = False
+            detection_data = {
+                "person_found": False,
+                "image_name": None,
+                "bounding_boxes": []
+            }
 
             # Pass 1: Key Frame Pass (I-frames only)
             print(f"Pass 1: Scanning I-frames in {filepath}...")
@@ -188,9 +199,15 @@ class FileHandler(FileSystemEventHandler):
                         for frame in packet.decode():
                             # Convert PyAV frame to BGR numpy array for YOLO/OpenCV
                             img = frame.to_ndarray(format='bgr24')
-                            if self._detect_person(img):
+                            found, boxes = self._detect_person(img)
+                            if found:
                                 person_detected = True
-                                self._handle_person_detected(filepath, img)
+                                image_name = self._handle_person_detected(filepath, img)
+                                detection_data.update({
+                                    "person_found": True,
+                                    "image_name": image_name,
+                                    "bounding_boxes": boxes
+                                })
                                 break
                     if person_detected:
                         break
@@ -201,7 +218,7 @@ class FileHandler(FileSystemEventHandler):
                 cap = cv2.VideoCapture(filepath)
                 if not cap.isOpened():
                     print(f"Could not open video: {filepath}")
-                    self._record_processed_file(filepath_resolved)
+                    self._record_processed_file(filepath_resolved, detection_data)
                     return
 
                 try:
@@ -212,10 +229,16 @@ class FileHandler(FileSystemEventHandler):
                             break
 
                         if frame_count % DEEP_SCAN_SKIP == 0:
-                            if self._detect_person(frame):
+                            found, boxes = self._detect_person(frame)
+                            if found:
                                 person_detected = True
                                 print(f"🎯 DEEP SCAN SUCCESS: Person detected in {filepath} (missed by I-frames)")
-                                self._handle_person_detected(filepath, frame)
+                                image_name = self._handle_person_detected(filepath, frame)
+                                detection_data.update({
+                                    "person_found": True,
+                                    "image_name": image_name,
+                                    "bounding_boxes": boxes
+                                })
                                 break
                         frame_count += 1
                 finally:
@@ -224,7 +247,7 @@ class FileHandler(FileSystemEventHandler):
             if not person_detected:
                 print(f"No person found in: {filepath}")
 
-            self._record_processed_file(filepath_resolved)
+            self._record_processed_file(filepath_resolved, detection_data)
 
         except Exception as e:
             print(f"Error processing {filepath}: {e}")
